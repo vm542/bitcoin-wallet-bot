@@ -55,9 +55,6 @@ def wallet_exist(user_id):
     row = cursor.fetchall()
     if (len(row) == 0):
         return 0 #no occurences in the database
-    #global current_address, current_privkey
-    #current_address = row[0][1]
-    #current_privkey = row[0][2]
     return (row[0][1], row[0][2])
 
 #create a wallet and save it in the database
@@ -117,7 +114,8 @@ def get_address(message):
             msg = bot.send_message(message.chat.id, "L'adresse du destinataire est incorrecte !", reply_markup=markup, parse_mode="Markdown")
             bot.register_next_step_handler(msg, process_step)
         else:
-            msg = bot.send_message(message.chat.id, "Quelle somme voulez-vous envoyer ?\n\nFonds disponibles : " + str(solde) + " BTC (~" + str(satoshi_to_currency(decimal.Decimal(solde) * decimal.Decimal(100000000), 'eur')) + " EUR).", reply_markup=markup3, parse_mode="Markdown")
+            commission = decimal.Decimal(get_fee_cached() * 250 / 100000000)
+            msg = bot.send_message(message.chat.id, "Quelle somme voulez-vous envoyer ?\n\nFonds disponibles : " + str(solde) + " BTC (~" + str(satoshi_to_currency(decimal.Decimal(solde) * decimal.Decimal(100000000), 'eur')) + " EUR).\n\n⚠️ Commission du réseau : " + str('%.6f' % commission) + " BTC (~" + str(satoshi_to_currency(commission * decimal.Decimal(100000000), 'eur')) + " EUR).", reply_markup=markup3, parse_mode="Markdown")
             bot.register_next_step_handler(msg, lambda msg: get_somme(msg, destinataire))
 
 def get_somme(message, destinataire):
@@ -134,7 +132,7 @@ def get_somme(message, destinataire):
             try:
                 outputs = [(str(destinataire), float(somme), 'btc'),]
                 trans_link = current_key.send(outputs)
-                msg = bot.send_message(message.chat.id, "Très bien, l'argent a été envoyé ! Voici l'adresse de votre transaction :\nhttps://blockchain.info/tx/" + str(trans_link) + ".", reply_markup=markup, parse_mode="Markdown")
+                msg = bot.send_message(message.chat.id, "Très bien, l'argent a été envoyé ! Les fonds seront disponibles d'ici une heure.\nVoici l'adresse de votre transaction :\nhttps://blockchain.info/tx/" + str(trans_link) + ".", reply_markup=markup, parse_mode="Markdown")
                 bot.register_next_step_handler(msg, process_step)
             except:
                 msg = bot.send_message(message.chat.id, "Vos BTC n'ont pas été envoyés ! Vérifiez bien que vous avez assez de fonds et réessayez.", reply_markup=markup, parse_mode="Markdown")
