@@ -28,14 +28,6 @@ markup2.add('↔️ Retirer')
 markup3 = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
 markup3.add('Annuler')
 
-current_address = ''
-current_privkey = ''
-current_user_id = ''
-current_key = ''
-
-destinataire = ''
-somme = 0
-
 digits58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
  
 def decode_base58(bc, length):
@@ -62,15 +54,14 @@ def wallet_exist(user_id):
     row = cursor.fetchall()
     if (len(row) == 0):
         return 0 #no occurences in the database
-    global current_address, current_privkey
-    current_address = row[0][1]
-    current_privkey = row[0][2]
-    return 1
+    #global current_address, current_privkey
+    #current_address = row[0][1]
+    #current_privkey = row[0][2]
+    return (row[0][1], row[0][2])
 
 #create a wallet and save it in the database
 
 def create_wallet(user_id):
-    global current_address, current_privkey    
     key = Key()
     current_address = key.address
     current_privkey = key.to_wif()
@@ -80,30 +71,36 @@ def create_wallet(user_id):
 
 @bot.message_handler(commands=['start'])
 def main(message):
-    global current_user_id, current_key
     current_user_id = message.from_user.id
-    if wallet_exist(current_user_id):
-        msg = bot.send_message(message.chat.id, "Bonjour, voici l'adresse de votre wallet Bitcoin : \n\n```" + current_address + "```\n\nUtilisez-la pour réapprovisionner votre porte-feuille Bitcoin.", reply_markup=markup, parse_mode="Markdown")
+    current_wallet = wallet_exist(current_user_id)
+    if wallet_exist(current_user_id) != 0:
+        msg = bot.send_message(message.chat.id, "Bonjour, voici l'adresse de votre wallet Bitcoin : \n\n```" + str(current_wallet[0]) + "```\n\nUtilisez-la pour réapprovisionner votre porte-feuille Bitcoin.", reply_markup=markup, parse_mode="Markdown")
     else:
         create_wallet(current_user_id)
-        msg = bot.send_message(message.chat.id, "Bonjour, j'ai créé pour vous un wallet Bitcoin, voici son son adresse : \n\n```" + current_address + "```\n\nUtilisez-la pour réapprovisionner votre porte-feuille Bitcoin.", reply_markup=markup, parse_mode="Markdown")
-    current_key = Key(current_privkey)
+        current_wallet = wallet_exist(current_user_id)
+        msg = bot.send_message(message.chat.id, "Bonjour, j'ai créé pour vous un wallet Bitcoin, voici son son adresse : \n\n```" + str(current_wallet[0]) + "```\n\nUtilisez-la pour réapprovisionner votre porte-feuille Bitcoin.", reply_markup=markup, parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_step)
 
 def process_step(message):
+    current_user_id = message.from_user.id
+    current_wallet = wallet_exist(current_user_id)
+    current_key = Key(current_wallet[1])
     solde = decimal.Decimal(current_key.get_balance('btc'))
     if message.text=='💰 Solde':
-        msg = bot.send_message(message.chat.id, "Adresse de votre wallet Bitcoin : ```" + str(current_address) + "```\n\nVous avez " + str(solde) + " BTC (~" + str(satoshi_to_currency(decimal.Decimal(solde) * decimal.Decimal(100000000), 'eur')) + " EUR).", reply_markup=markup, parse_mode="Markdown")
+        msg = bot.send_message(message.chat.id, "Adresse de votre wallet Bitcoin : ```" + current_wallet[0] + "```\n\nVous avez " + str(solde) + " BTC (~" + str(satoshi_to_currency(decimal.Decimal(solde) * decimal.Decimal(100000000), 'eur')) + " EUR).", reply_markup=markup, parse_mode="Markdown")
         bot.register_next_step_handler(message, process_step)
     elif message.text == '↔️ Retirer':
         msg = bot.send_message(message.chat.id, "Entrez l'adresse du destinataire", reply_markup=markup3, parse_mode="Markdown")
         bot.register_next_step_handler(msg, get_address)
 
 def get_address(message):
-    global destinataire
+    current_user_id = message.from_user.id
+    current_wallet = wallet_exist(current_user_id)
+    current_key = Key(current_wallet[1])
     solde = decimal.Decimal(current_key.get_balance('btc'))
+    global destinataire
     if message.text=='Annuler':
-        msg = bot.send_message(message.chat.id, "Bonjour, voici l'adresse de votre wallet Bitcoin : \n\n```" + current_address + "```\n\nUtilisez-la pour réapprovisionner votre porte-feuille Bitcoin.", reply_markup=markup, parse_mode="Markdown")
+        msg = bot.send_message(message.chat.id, "Bonjour, voici l'adresse de votre wallet Bitcoin : \n\n```" + current_wallet[0] + "```\n\nUtilisez-la pour réapprovisionner votre porte-feuille Bitcoin.", reply_markup=markup, parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_step)
     else:
         destinataire = str(message.text)
@@ -112,11 +109,15 @@ def get_address(message):
             bot.register_next_step_handler(msg, process_step)
         else:
             msg = bot.send_message(message.chat.id, "Quelle somme voulez-vous envoyer ?\n\nFonds disponibles : " + str(solde) + " BTC (~" + str(satoshi_to_currency(decimal.Decimal(solde) * decimal.Decimal(100000000), 'eur')) + " EUR).", reply_markup=markup3, parse_mode="Markdown")
-            bot.register_next_step_handler(msg, get_somme)
+            bot.register_next_step_handler(msg, lambda msg: get_somme(msg, destinataire))
 
-def get_somme(message):
+def get_somme(message, destinataire):
+    current_user_id = message.from_user.id
+    current_wallet = wallet_exist(current_user_id)
+    current_key = Key(current_wallet[1])
+    solde = decimal.Decimal(current_key.get_balance('btc'))
     if message.text=='Annuler':
-        msg = bot.send_message(message.chat.id, "Bonjour, voici l'adresse de votre wallet Bitcoin : \n\n```" + current_address + "```\n\nUtilisez-la pour réapprovisionner votre porte-feuille Bitcoin.", reply_markup=markup, parse_mode="Markdown")
+        msg = bot.send_message(message.chat.id, "Bonjour, voici l'adresse de votre wallet Bitcoin : \n\n```" + current_wallet[0] + "```\n\nUtilisez-la pour réapprovisionner votre porte-feuille Bitcoin.", reply_markup=markup, parse_mode="Markdown")
         bot.register_next_step_handler(msg, process_step)
     else:
         try:
