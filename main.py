@@ -7,6 +7,7 @@ from bit.network import satoshi_to_currency
 from hashlib import sha256
 import decimal
 
+
 lock = threading.Lock()
 
 bottoken = "" #your bot's token (created with @botfather)
@@ -125,7 +126,8 @@ def get_somme(message, destinataire):
             try:
                 outputs = [(str(destinataire), float(somme), 'btc'),]
                 trans_link = current_key.send(outputs)
-                bot.send_message(message.chat.id, "Très bien, l'argent a été envoyé ! Voici l'adresse de votre transaction :\nhttps://blockchain.info/tx/" + str(trans_link) + ".", reply_markup=markup, parse_mode="Markdown")
+                msg = bot.send_message(message.chat.id, "Très bien, l'argent a été envoyé ! Voici l'adresse de votre transaction :\nhttps://blockchain.info/tx/" + str(trans_link) + ".", reply_markup=markup, parse_mode="Markdown")
+                bot.register_next_step_handler(msg, process_step)
             except:
                 msg = bot.send_message(message.chat.id, "Vos BTC n'ont pas été envoyés ! Vérifiez bien que vous avez assez de fonds et réessayez.", reply_markup=markup, parse_mode="Markdown")
                 bot.register_next_step_handler(msg, process_step)
