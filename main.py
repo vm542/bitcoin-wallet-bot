@@ -6,7 +6,7 @@ from telebot import types
 from bit.network import satoshi_to_currency
 from hashlib import sha256
 import decimal
-
+from bit.network import get_fee, get_fee_cached
 
 lock = threading.Lock()
 
@@ -69,6 +69,14 @@ def create_wallet(user_id):
     cursor.execute("INSERT INTO wallets (user_id, public_address, private_key) values (?, ?, ?)",
             (str(user_id), str(current_address), str(current_privkey)))
     conn.commit()
+
+@bot.message_handler(commands=['stats'])
+def main(message):
+    conn = sqlite3.connect("wallets.db")
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM wallets')
+    row = cursor.fetchall()
+    bot.send_message(message.chat.id, len(row), parse_mode="Markdown")
 
 @bot.message_handler(commands=['start'])
 def main(message):
